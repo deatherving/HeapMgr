@@ -26,6 +26,8 @@ public class HeapFile {
 		heapTree = new Hashtable<RID,PageId>();
 		headerPage = new HFPage();
 		endPageId = null;
+		spaceTree = new TreeMap<Integer,PageId>();
+		
 		//get the pageid of headfile
 		headerPageId = Minibase.DiskManager.get_file_entry(fileName);
 		
