@@ -15,6 +15,7 @@ public class HeapFile {
 	private HFPage headerPage;
 	private String fileName;
 	private int numRecords;
+	private PageId endPageId;
 	Hashtable<RID,PageId> heapTree;
 	TreeMap<Integer,PageId> spaceTree;
 	
@@ -24,6 +25,7 @@ public class HeapFile {
 		numRecords = 0;
 		heapTree = new Hashtable<RID,PageId>();
 		headerPage = new HFPage();
+		endPageId = null;
 		//get the pageid of headfile
 		headerPageId = Minibase.DiskManager.get_file_entry(fileName);
 		
@@ -81,8 +83,11 @@ public class HeapFile {
 					//update our space hashmap
 					spaceTree.put((int) tempHeader.getFreeSpace(), tempHeaderId);
 				}
-				else
+				else{
+					endPageId = tempHeaderId;
 					break;
+				}
+					
 			}
 		}
 	}
@@ -99,7 +104,18 @@ public class HeapFile {
 		int recLen = record.length;
 		PageId curId = new PageId(headerPageId.pid);
 		HFPage curHfPage = null;
-		if(spaceMap)
+		if(spaceTree.size() == 0 || spaceTree.lastKey() < recLen){
+			// allocate a new page
+			
+			
+			
+		}
+		else{
+			PageId hfpage = spaceTree.get(spaceTree.lastKey());
+			
+			
+			
+		}
 		
 		
 		
