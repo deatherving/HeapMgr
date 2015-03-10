@@ -97,8 +97,17 @@ public class HeapFile {
 					rid = tempHeader.firstRecord();
 					//update our space hashmap
 					
-					
-					spaceTree.put((int) tempHeader.getFreeSpace(), tempHeaderId);
+					int freeSpace = tempHeader.getFreeSpace();
+					if(spaceTree.containsKey(freeSpace)){
+						Queue<PageId> temp0 = spaceTree.get(freeSpace);
+						temp0.add(tempHeaderId);
+						spaceTree.replace(freeSpace, temp0);
+					}
+					else{
+						Queue<PageId> temp1 = new LinkedList<PageId>();
+						temp1.add(tempHeaderId);
+						spaceTree.put((int) tempHeader.getFreeSpace(), temp1);
+					}
 				}
 				else{
 					endPageId = tempHeaderId;
@@ -137,7 +146,19 @@ public class HeapFile {
 			//update heapTree
 			heapTree.put(rid, newLastId);
 			//update spaceTree
-			spaceTree.put((int) newLastPage.getFreeSpace(), newLastId);
+			
+			int freeSpace = newLastPage.getFreeSpace();
+			if(spaceTree.containsKey(freeSpace)){
+				Queue<PageId> temp0 = spaceTree.get(freeSpace);
+				temp0.add(newLastId);
+				spaceTree.replace(freeSpace, temp0);
+			}
+			else{
+				Queue<PageId> temp1 = new LinkedList<PageId>();
+				temp1.add(newLastId);
+				spaceTree.put(freeSpace, temp1);
+			}
+			
 			
 			//upin those
 			Minibase.BufferManager.unpinPage(endPageId, true);
@@ -147,17 +168,36 @@ public class HeapFile {
 		}
 		//if there is, just insert
 		else{
-			PageId hfPageId = spaceTree.get(spaceTree.lastKey());
+			int maxSpace = spaceTree.lastKey();
+			Queue<PageId> temp0 = spaceTree.get(maxSpace);
+			PageId hfPageId = temp0.poll();
+			
+			//update the space tree
+			if(temp0.size() == 0)
+				spaceTree.remove(maxSpace);
+			else
+				spaceTree.replace(maxSpace,temp0);
+				
+			
 			HFPage hfPage = new HFPage();
 			Minibase.BufferManager.pinPage(hfPageId, hfPage, false);
 			rid = hfPage.insertRecord(record);
 			//update heapTree
 			heapTree.put(rid, hfPageId);
 			//update spaceTree
-			//remove the last one
-			spaceTree.remove(spaceTree.lastKey());
-			//update the previous one
-			spaceTree.put((int) hfPage.getFreeSpace(), hfPageId);
+			int space = hfPage.getFreeSpace();
+			if(spaceTree.containsKey(space)){
+				Queue<PageId> temp1 = spaceTree.get(space);
+				temp0.add(hfPageId);
+				spaceTree.replace(space, temp0);
+			}
+			else{
+				Queue<PageId> temp2 = new LinkedList<PageId>();
+				temp2.add(hfPageId);
+				spaceTree.put(space, temp2);
+			}
+			
+			
 			Minibase.BufferManager.unpinPage(hfPageId, true);
 		}
 	}
@@ -169,7 +209,6 @@ public class HeapFile {
 		PageId targetId = heapTree.get(rid);
 		HFPage targetPage = new HFPage();
 		Minibase.BufferManager.pinPage(targetId, targetPage, false);
-		
 		byte[] data = targetPage.selectRecord(rid);
 		tp = new Tuple(data);
 		Minibase.BufferManager.unpinPage(targetId, false);
@@ -180,11 +219,38 @@ public class HeapFile {
 		HFPage targetPage = new HFPage();
 		PageId targetId = heapTree.get(rid);
 		Minibase.BufferManager.pinPage(targetId, targetPage, false);
-		
+		int spaceBefore = targetPage.getFreeSpace();
 		targetPage.updateRecord(rid, newRecord);
+		int spaceAfter = targetPage.getFreeSpace();
+		
+		//remove before
+		Queue<PageId> temp0 = spaceTree.get(spaceBefore);
+		temp0.remove(targetId);
+		if(temp0.size() == 0)
+			spaceTree.remove(spaceBefore);
+		else
+			spaceTree.replace(spaceBefore,temp0);
+		
+		//update space tree after
+		if(spaceTree.containsKey(spaceAfter)){
+			Queue<PageId> temp1 = spaceTree.get(spaceAfter);
+			temp1.add(targetId);
+			spaceTree.replace(spaceAfter, temp1);
+		}
+		else{
+			Queue<PageId> temp2 = new LinkedList<PageId>();
+			temp2.add(targetId);
+			spaceTree.put(spaceAfter, temp2);
+		}
+		
+		
+		
+		
 		Minibase.BufferManager.unpinPage(rid.pageno, true);
 		return true;
 	}
+	
+	
 	
 	public boolean deleteRecord(RID rid) {
 		
