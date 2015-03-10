@@ -126,6 +126,7 @@ public class HeapFile {
 	public RID insertRecord(byte[] record) throws ChainException {
 		if(record.length > GlobalConst.MAX_TUPSIZE)
 			throw new SpaceNotAvailableException(null, "SpaceNotAvailableException");
+		numRecords++;
 		RID rid = null;
 		int recLen = record.length;
 		PageId curId = new PageId(headerPageId.pid);
@@ -243,44 +244,24 @@ public class HeapFile {
 			spaceTree.put(spaceAfter, temp2);
 		}
 		
-		
-		
-		
 		Minibase.BufferManager.unpinPage(rid.pageno, true);
+		numRecords--;
 		return true;
 	}
 	
 	
 	
-	public boolean deleteRecord​(RID rid) {
-		if(rid == null)
-			return false;
-		
-		PageId pid = rid.pageno;
-		
-		HFPage hp = new HFPage();
-	
-		Minibase.BufferManager.pinPage(pid, hp, false);
-		
-		hp.deleteRecord(rid);
-		
-		Minibase.BufferManager.unpinPage(pid, true);
-		
-		//update two datastructure
-		
-		heapTree.remove(rid);
-		
-		
-				
+	public boolean deleteRecord(RID rid) {
 		
 		return true;
 	}
 
 	public int getRecCnt() {
-		return numRecords;
+		
+		return 0;
 	}
 	
-	public HeapScan openScan​() {
+	public HeapScan openScan() {
 		
 		HeapFile hf = new HeapFile("test");
 		HeapScan sc = new HeapScan(hf);
