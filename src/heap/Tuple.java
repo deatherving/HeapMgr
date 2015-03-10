@@ -1,23 +1,35 @@
 package heap;
+import global.GlobalConst;
 
-public class Tuple{
-	Byte [] tuple;
+public class Tuple implements GlobalConst{
 	
-	public Tuple() {
-		
+	public byte[] data;
+	public int length;
+	public int offset;
+	private static final int maxSize = GlobalConst.MAX_TUPSIZE;
+	public Tuple() 
+	{
+		data = new byte[maxSize];
+		length = 0;
+		offset = 0;
 	}
-
-	public Tuple(byte[] byteArray, int i, int recLength) {
-		// TODO Auto-generated constructor stub
+	public Tuple(byte[] indata, int inoff, int inlength)
+	{
+		data = indata;
+		offset = inoff;
+		length = inlength;
 	}
-
-	public int getLength() {
-		// TODO Auto-generated method stub
-		return 0;
+	public int getLength()
+	{
+		return length;
 	}
-
-	public byte[] getTupleByteArray() {
-		// TODO Auto-generated method stub
-		return null;
+	public byte[] getTupleByteArray()
+	{
+		return data;
 	}
+	public byte[] getData()
+	{
+		return data;
+	}
+	
 }
