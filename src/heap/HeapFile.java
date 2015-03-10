@@ -62,7 +62,7 @@ public class HeapFile {
 				heapTree.put(rid, tempHeaderId);
 			//update space hashmap
 			spaceTree.put((int) tempHeader.getFreeSpace(), tempHeaderId);
-			numRecords++;
+			
 			while(true){
 				//get how many records 
 				if(rid != null){
