@@ -17,7 +17,7 @@ public class HeapFile {
 	private int numRecords;
 	private PageId endPageId;
 	Hashtable<RID,PageId> heapTree;
-	TreeMap<Integer,PageId> spaceTree;
+	TreeMap<Integer,Queue<PageId>> spaceTree;
 	
 	public HeapFile(String name) {
 		headerPageId = new PageId();
@@ -26,7 +26,13 @@ public class HeapFile {
 		heapTree = new Hashtable<RID,PageId>();
 		headerPage = new HFPage();
 		endPageId = null;
-		spaceTree = new TreeMap<Integer,PageId>();
+		spaceTree = new TreeMap<Integer,Queue<PageId>>();
+		
+
+		//Queue initialize
+			
+		//Queue<PageId> obj = new LinkedList<PageId>();
+		
 		
 		//get the pageid of headfile
 		headerPageId = Minibase.DiskManager.get_file_entry(fileName);
@@ -47,10 +53,13 @@ public class HeapFile {
 			headerPage.setCurPage(headerPageId);
 			headerPage.setPrevPage(null);
 			headerPage.setNextPage(null);
-			spaceTree.put((int)headerPage.getFreeSpace(),headerPageId);
+			
+			//initialize queue<Pageid>
+			Queue<PageId> temp = new LinkedList<PageId>();
+			temp.add(headerPageId);
+			
+			spaceTree.put((int)headerPage.getFreeSpace(),temp);
 			Minibase.BufferManager.unpinPage(headerPageId, false);
-			
-			
 		}
 		else{
 			//get the headerfile into headerPage
@@ -62,10 +71,14 @@ public class HeapFile {
 			PageId tempHeaderId = headerPageId;
 			//the first record
 			RID rid = tempHeader.firstRecord();
+			
 			if(rid != null)
 				heapTree.put(rid, tempHeaderId);
 			//update space hashmap
-			spaceTree.put((int) tempHeader.getFreeSpace(), tempHeaderId);
+			
+			Queue<PageId> temp = new LinkedList<PageId>();
+			temp.add(headerPageId);
+			spaceTree.put((int) tempHeader.getFreeSpace(), temp);
 			
 			while(true){
 				//get how many records 
@@ -83,6 +96,8 @@ public class HeapFile {
 					Minibase.BufferManager.unpinPage(tempHeaderId,true);
 					rid = tempHeader.firstRecord();
 					//update our space hashmap
+					
+					
 					spaceTree.put((int) tempHeader.getFreeSpace(), tempHeaderId);
 				}
 				else{
@@ -106,92 +121,67 @@ public class HeapFile {
 		int recLen = record.length;
 		PageId curId = new PageId(headerPageId.pid);
 		HFPage curHfPage = null;
+		
+		//if there is no page available to insert we have to allocate a new page
 		if(spaceTree.size() == 0 || spaceTree.lastKey() < recLen){
 			// allocate a new page
+			HFPage lastPage = new HFPage();
+			HFPage newLastPage = new HFPage();
+			Minibase.BufferManager.pinPage(endPageId, lastPage, false);
 			
+			PageId newLastId = Minibase.BufferManager.newPage(newLastPage, 1);
+			rid = newLastPage.insertRecord(record);
+			lastPage.setNextPage(newLastId);
+			newLastPage.setPrevPage(endPageId);
 			
+			//update heapTree
+			heapTree.put(rid, newLastId);
+			//update spaceTree
+			spaceTree.put((int) newLastPage.getFreeSpace(), newLastId);
 			
+			//upin those
+			Minibase.BufferManager.unpinPage(endPageId, true);
+			Minibase.BufferManager.unpinPage(newLastId, true);
+		
+			return rid;
 		}
+		//if there is, just insert
 		else{
-			PageId hfpage = spaceTree.get(spaceTree.lastKey());
-			
-			
-			
+			PageId hfPageId = spaceTree.get(spaceTree.lastKey());
+			HFPage hfPage = new HFPage();
+			Minibase.BufferManager.pinPage(hfPageId, hfPage, false);
+			rid = hfPage.insertRecord(record);
+			//update heapTree
+			heapTree.put(rid, hfPageId);
+			//update spaceTree
+			//remove the last one
+			spaceTree.remove(spaceTree.lastKey());
+			//update the previous one
+			spaceTree.put((int) hfPage.getFreeSpace(), hfPageId);
+			Minibase.BufferManager.unpinPage(hfPageId, true);
 		}
-		
-		
-		
-		
-		boolean flag = false;
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		
-		while(curId.pid != -1){
-			if(curHfPage.getFreeSpace() >= recLen){
-				numRecords++;
-				rid = curHfPage.insertRecord(record);
-				Minibase.BufferManager.unpinPage(curId, true);
-				rid.pageno = curId;
-				return rid;
-			}
-			else if(curHfPage.getNextPage().pid != -1){
-				PageId newId = curHfPage.getNextPage();
-				Page newPage = new Page();
-				Minibase.BufferManager.pinPage(newId, newPage, false);
-				curHfPage  = new HFPage(newPage);
-				curId = newId;
-			}
-			else{
-				//allocate a new page
-				PageId newId = new PageId();
-				Page newPage = new Page();
-				newId = Minibase.BufferManager.newPage(newPage, 1);
-				
-				//set old page's next page
-				curHfPage.setNextPage(newId);
-				//save old page's next page
-				Minibase.BufferManager.unpinPage(curId, true);
-				
-				//move forward the old page to new page
-				curHfPage = new HFPage(newPage);
-				//update new page's previous page
-				curHfPage.setPrevPage(curId);
-				curId = newId;
-				//save new page's previous page
-				Minibase.BufferManager.unpinPage(curId, true);
-				
-			}
-		}
-		return rid;
 	}
+		
+		
 	
 	public Tuple getRecord(RID rid) {
 		Tuple tp = null;
-		HFPage temp = new HFPage();
-		Minibase.BufferManager.pinPage(rid.pageno, temp, false);
-		byte[] input = temp.selectRecord(rid);
-		tp = new Tuple(input);
+		PageId targetId = heapTree.get(rid);
+		HFPage targetPage = new HFPage();
+		Minibase.BufferManager.pinPage(targetId, targetPage, false);
+		
+		byte[] data = targetPage.selectRecord(rid);
+		tp = new Tuple(data);
+		Minibase.BufferManager.unpinPage(targetId, false);
 		return tp;
 	}
 	
 	public boolean updateRecord(RID rid, Tuple newRecord) throws ChainException {
-		HFPage temp = new HFPage();
-		Minibase.BufferManager.pinPage(rid.pageno, temp, false);
-		temp.updateRecord(rid, newRecord);
+		HFPage targetPage = new HFPage();
+		PageId targetId = heapTree.get(rid);
+		Minibase.BufferManager.pinPage(targetId, targetPage, false);
+		
+		targetPage.updateRecord(rid, newRecord);
 		Minibase.BufferManager.unpinPage(rid.pageno, true);
 		return true;
 	}
