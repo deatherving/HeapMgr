@@ -252,17 +252,35 @@ public class HeapFile {
 	
 	
 	
-	public boolean deleteRecord(RID rid) {
+	public boolean deleteRecord​(RID rid) {
+		if(rid == null)
+			return false;
+		
+		PageId pid = rid.pageno;
+		
+		HFPage hp = new HFPage();
+	
+		Minibase.BufferManager.pinPage(pid, hp, false);
+		
+		hp.deleteRecord(rid);
+		
+		Minibase.BufferManager.unpinPage(pid, true);
+		
+		//update two datastructure
+		
+		heapTree.remove(rid);
+		
+		
+				
 		
 		return true;
 	}
 
 	public int getRecCnt() {
-		
-		return 0;
+		return numRecords;
 	}
 	
-	public HeapScan openScan() {
+	public HeapScan openScan​() {
 		
 		HeapFile hf = new HeapFile("test");
 		HeapScan sc = new HeapScan(hf);
